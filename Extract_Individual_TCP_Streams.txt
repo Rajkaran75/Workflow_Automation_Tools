@@ -1,0 +1,42 @@
+# ---------- Configuration for Desired IP Addresses ----------
+
+$PCAP = "filename or filepath here"       # Adjust as needed
+$IP1 = @("10.10.10.25")
+$IP2 = @("10.10.10.120")
+$PairFolder = "${IP1}_$IP2"
+$CsvFile = Join-Path $PairFolder "streams_summary.csv"
+# ----------------------------------------
+
+# Create output folder
+New-Item -ItemType Directory -Path $PairFolder -ErrorAction SilentlyContinue | Out-Null
+
+# Write CSV header
+"starttime,endtime,tcp stream number,src_ip,dest_ip,src_port,dest_port" | Out-File -FilePath $CsvFile -Encoding ascii
+
+# Filter for all TCP between the two IPs (any direction)
+$filter = "tcp && ((ip.src==$IP1 && ip.dst==$IP2) || (ip.src==$IP2 && ip.dst==$IP1))"
+$streams = & tshark -n -r $PCAP -Y $filter -T fields -e tcp.stream 2>$null | Where-Object { $_ -ne "" } | Sort-Object {[int]$_} -Unique
+
+foreach ($stream in $streams) {
+    # Save per-stream PCAP
+    $outFile = Join-Path $PairFolder ("tcp_stream_${stream}.pcapng")
+    & tshark -n -r $PCAP -Y "tcp.stream==$stream && $filter" -w $outFile
+
+    # Get all frame.time values for this stream
+    $times = (& tshark -n -r $PCAP -Y "tcp.stream==$stream && $filter" -T fields -e frame.time 2>$null)
+    if (-not $times) { continue }
+
+    # Extract only the hh:mm:ss from each time string using regex
+    $justTimes = $times | ForEach-Object { if ($_ -match "\s(\d{2}:\d{2}:\d{2})") { $matches[1] } }
+    $start = ($justTimes | Select-Object -First 1)
+    $end   = ($justTimes | Select-Object -Last 1)
+
+    # Get 4-tuple from first packet of the stream
+    $firstPkt = (& tshark -n -r $PCAP -Y "tcp.stream==$stream && $filter" -T fields -E separator=`t -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport 2>$null | Select-Object -First 1)
+    if (-not $firstPkt) { continue }
+    $parts = $firstPkt -split "`t"
+    $src_ip, $dst_ip, $src_port, $dst_port = $parts[0], $parts[1], $parts[2], $parts[3]
+
+    # Write stream info to CSV
+    "$start,$end,$stream,$src_ip,$dst_ip,$src_port,$dst_port" | Out-File -FilePath $CsvFile -Encoding ascii -Append
+}
