@@ -1,3 +1,6 @@
+
+
+
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
@@ -15,14 +18,15 @@ class CANFilterTool:
     def __init__(self, root):
         self.root = root
         self.root.title("CAN ID Filter Tool - Enhanced")
-        self.root.geometry("1250x1050")
+        self.root.geometry("800x600")
         self.root.resizable(True, True)
+        self.root.minsize(1200, 1050)  # Minimum size to prevent it from being too small
         
         self.input_file_var = tk.StringVar()
         self.output_file_var = tk.StringVar()
         self.case_sensitive_var = tk.BooleanVar(value=False)
         self.exclude_mode_var = tk.BooleanVar(value=False)
-        self.exact_match_var = tk.BooleanVar(value=True)
+        self.exact_match_var = tk.BooleanVar(value=False)
         
         self.presets_file = "can_id_presets.json"
         
@@ -30,6 +34,10 @@ class CANFilterTool:
         self.load_preset_list()
     
     def create_widgets(self):
+        # Configure style for larger checkboxes
+        style = ttk.Style()
+        style.configure('Large.TCheckbutton', font=('Arial', 11))
+        
         # Input/Output Frame
         io_frame = tk.LabelFrame(self.root, text="Input/Output Files", padx=10, pady=10)
         io_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
@@ -50,7 +58,6 @@ class CANFilterTool:
         self.can_ids_entry = tk.Entry(filter_frame, width=60)
         self.can_ids_entry.grid(row=0, column=1, columnspan=2, padx=5, pady=5)
         
-        # Checkboxes with larger font
         # Checkboxes with larger font and bigger checkbox squares
         checkbox_font = ("Arial", 11)
         ttk.Checkbutton(filter_frame, text="Case Sensitive", variable=self.case_sensitive_var, style='Large.TCheckbutton').grid(row=1, column=0, sticky="w", pady=8, padx=5)
@@ -86,7 +93,7 @@ class CANFilterTool:
         button_frame.grid(row=5, column=0, pady=10)
         
         tk.Button(button_frame, text="Filter", command=self.filter_can_ids, width=15, bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="Preview (10 lines)", command=self.preview_results, width=15).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Preview (250 lines)", command=self.preview_results, width=18).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame, text="Clear", command=self.clear_fields, width=15).pack(side=tk.LEFT, padx=5)
     
     def select_input_file(self):
@@ -217,7 +224,7 @@ class CANFilterTool:
             self.progress['value'] = 0
     
     def preview_results(self):
-        """Show first 10 matching lines"""
+        """Show first 250 matching lines"""
         input_file = self.input_file_var.get()
         can_ids_str = self.can_ids_entry.get()
         
@@ -234,19 +241,34 @@ class CANFilterTool:
             return
         
         preview_window = tk.Toplevel(self.root)
-        preview_window.title("Preview - First 10 Matches")
-        preview_window.geometry("800x400")
+        preview_window.title("Preview - First 250 Matches")
+        preview_window.geometry("1000x600")
         
-        text_widget = tk.Text(preview_window, wrap=tk.NONE, width=100, height=20)
-        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Create frame for text widget and scrollbars
+        text_frame = tk.Frame(preview_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        scrollbar_y = tk.Scrollbar(preview_window, command=text_widget.yview)
-        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        # Create text widget
+        text_widget = tk.Text(text_frame, wrap=tk.NONE, font=("Courier", 9))
+        text_widget.grid(row=0, column=0, sticky="nsew")
+        
+        # Vertical scrollbar
+        scrollbar_y = tk.Scrollbar(text_frame, command=text_widget.yview)
+        scrollbar_y.grid(row=0, column=1, sticky="ns")
         text_widget.config(yscrollcommand=scrollbar_y.set)
         
-        scrollbar_x = tk.Scrollbar(preview_window, orient=tk.HORIZONTAL, command=text_widget.xview)
-        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+        # Horizontal scrollbar
+        scrollbar_x = tk.Scrollbar(text_frame, orient=tk.HORIZONTAL, command=text_widget.xview)
+        scrollbar_x.grid(row=1, column=0, sticky="ew")
         text_widget.config(xscrollcommand=scrollbar_x.set)
+        
+        # Configure grid weights
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+        
+        # Status label
+        status_label = tk.Label(preview_window, text="Loading...", relief=tk.SUNKEN, anchor=tk.W)
+        status_label.pack(fill=tk.X, padx=10, pady=(0, 10))
         
         try:
             count = 0
@@ -258,11 +280,14 @@ class CANFilterTool:
                        (not match_found and self.exclude_mode_var.get()):
                         text_widget.insert(tk.END, line)
                         count += 1
-                        if count >= 10:
+                        if count >= 250:
                             break
             
             if count == 0:
                 text_widget.insert(tk.END, "No matches found in the file.")
+                status_label.config(text="No matches found")
+            else:
+                status_label.config(text=f"Showing {count} matching lines")
             
             text_widget.config(state=tk.DISABLED)
             
@@ -344,6 +369,24 @@ if __name__ == "__main__":
     root.mainloop()
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # import tkinter as tk
 # from tkinter import filedialog, messagebox, ttk
 # import os
@@ -361,14 +404,14 @@ if __name__ == "__main__":
 #     def __init__(self, root):
 #         self.root = root
 #         self.root.title("CAN ID Filter Tool - Enhanced")
-#         self.root.geometry("750x550")
+#         self.root.geometry("1250x1050")
 #         self.root.resizable(True, True)
         
 #         self.input_file_var = tk.StringVar()
 #         self.output_file_var = tk.StringVar()
 #         self.case_sensitive_var = tk.BooleanVar(value=False)
 #         self.exclude_mode_var = tk.BooleanVar(value=False)
-#         self.exact_match_var = tk.BooleanVar(value=True)
+#         self.exact_match_var = tk.BooleanVar(value=False)
         
 #         self.presets_file = "can_id_presets.json"
         
@@ -396,10 +439,12 @@ if __name__ == "__main__":
 #         self.can_ids_entry = tk.Entry(filter_frame, width=60)
 #         self.can_ids_entry.grid(row=0, column=1, columnspan=2, padx=5, pady=5)
         
-#         # Checkboxes
-#         tk.Checkbutton(filter_frame, text="Case Sensitive", variable=self.case_sensitive_var).grid(row=1, column=0, sticky="w", pady=5)
-#         tk.Checkbutton(filter_frame, text="Exclude Mode (inverse)", variable=self.exclude_mode_var).grid(row=1, column=1, sticky="w", pady=5)
-#         tk.Checkbutton(filter_frame, text="Exact Match", variable=self.exact_match_var).grid(row=1, column=2, sticky="w", pady=5)
+#         # Checkboxes with larger font
+#         # Checkboxes with larger font and bigger checkbox squares
+#         checkbox_font = ("Arial", 11)
+#         ttk.Checkbutton(filter_frame, text="Case Sensitive", variable=self.case_sensitive_var, style='Large.TCheckbutton').grid(row=1, column=0, sticky="w", pady=8, padx=5)
+#         ttk.Checkbutton(filter_frame, text="Exclude Mode (inverse)", variable=self.exclude_mode_var, style='Large.TCheckbutton').grid(row=1, column=1, sticky="w", pady=8, padx=5)
+#         ttk.Checkbutton(filter_frame, text="Exact Match", variable=self.exact_match_var, style='Large.TCheckbutton').grid(row=1, column=2, sticky="w", pady=8, padx=5)
         
 #         # Presets Frame
 #         preset_frame = tk.LabelFrame(self.root, text="CAN ID Presets", padx=10, pady=10)
@@ -686,3 +731,4 @@ if __name__ == "__main__":
 #     root = tk.Tk()
 #     app = CANFilterTool(root)
 #     root.mainloop()
+
